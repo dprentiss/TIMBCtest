@@ -1,0 +1,67 @@
+fcTableLookup <- function(lanes, duration, spd, vol) {
+  return(fc_cars[fc_cars$vol == vol & fc_cars$spd == spd & fc_cars$duration == duration & fc_cars$variable == lanes,]$value)
+}
+
+interpolateValue <- function(lanes, duration, spd, vol) {
+  
+  # use concise var names
+  xc <- duration
+  yc <- spd
+  zc <- vol
+  
+  # get unique values from table
+  uniqueDurations <- unique(fc_cars$duration)
+  uniqueSpds <- unique(fc_cars$spd)
+  uniqueVols <- unique(fc_cars$vol)
+  
+  # get nearest points from table inputs
+  xl <- max(uniqueDurations[uniqueDurations <= duration])
+  yl <- max(uniqueSpds[uniqueSpds <= spd])
+  zl <- max(uniqueVols[uniqueVols <= vol])
+  xu <- min(uniqueDurations[uniqueDurations >= duration])
+  yu <- min(uniqueSpds[uniqueSpds >= spd])
+  zu <- min(uniqueVols[uniqueVols >= vol])
+  
+  # check if some inputs are exact matches to table, normalize if so
+  if (xl == xu) xl = xu - 1
+  if (yl == yu) yl = yu - 1
+  if (zl == zu) zl = zu - 1
+  
+  # calculate weights
+  Wlll <- (xu - xc) * (yu - yc) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wllu <- (xu - xc) * (yu - yc) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wlul <- (xu - xc) * (yc - yl) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wluu <- (xu - xc) * (yc - yl) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wull <- (xc - xl) * (yu - yc) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wulu <- (xc - xl) * (yu - yc) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wuul <- (xc - xl) * (yc - yl) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  Wuuu <- (xc - xl) * (yc - yl) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+
+  # reset lower nearest points for table lookup
+  xl <- max(uniqueDurations[uniqueDurations <= duration])
+  yl <- max(uniqueSpds[uniqueSpds <= spd])
+  zl <- max(uniqueVols[uniqueVols <= vol])
+
+  # lookup nearest points from table
+  
+  FClll <- fcTableLookup(lanes, xl, yl, zl)(xu - xc) * (yu - yc) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCllu <- fcTableLookup(lanes, xl, yl, zu)(xu - xc) * (yu - yc) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  FClul <- fcTableLookup(lanes, xl, yu, zl)(xu - xc) * (yc - yl) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCluu <- fcTableLookup(lanes, xl, yu, zu)(xu - xc) * (yc - yl) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCull <- fcTableLookup(lanes, xu, yl, zl)(xc - xl) * (yu - yc) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCulu <- fcTableLookup(lanes, xu, yl, zu)(xc - xl) * (yu - yc) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCuul <- fcTableLookup(lanes, xu, yu, zl)(xc - xl) * (yc - yl) * (zu - zc) / (xu - xl) / (yu - yl) / (zu - zl)
+  FCuuu <- fcTableLookup(lanes, xu, yu, zu)(xc - xl) * (yc - yl) * (zc - zl) / (xu - xl) / (yu - yl) / (zu - zl)
+  
+  FCvalue <- FClll * Wlll +
+           FCllu * Wllu +
+           FClul * Wlul +
+           FCluu * Wluu +
+           FCull * Wull +
+           FCulu * Wulu +
+           FCuul * Wuul +
+           FCuuu * Wuuu  
+  
+  return(c(xl, yl, zl, xu, yu, zu, Wlll, Wllu, Wlul, Wluu, Wull, Wulu, Wuul, Wuuu, FClll, FCllu, FCWlul, FCWluu, FCWull, FCWulu, FCWuul, FCWuuu, FCvalue))
+}
+
